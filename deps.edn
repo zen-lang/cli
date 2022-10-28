@@ -1,0 +1,21 @@
+{:paths ["src" "pkg"]
+
+ :lib "zen-lang/cli"
+ :version "0.0.1-SNAPSHOT"
+
+ :deps {org.clojure/clojure  {:mvn/version "1.11.1"}
+        healthsamurai/matcho {:mvn/version "0.3.9"}}
+
+ :aliases
+ {:kaocha
+  {:extra-deps {lambdaisland/kaocha  {:mvn/version "1.69.1069"}}
+   :extra-paths ["runner" "test"]
+   :jvm-opts    ^:replace ["-XX:-OmitStackTraceInFastThrow"]
+   :main-opts   ["-m" "kaocha.runner" "--config-file" "test/test.edn"]}
+
+  :build
+  {:extra-paths ["build"]
+   :ns-default build.zen
+   :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]
+   :extra-deps {io.github.clojure/tools.build {:git/url "https://github.com/clojure/tools.build"
+                                               :sha "cde5adf5d56fe7238de509339e63627f438e5d4b"}}}}}
