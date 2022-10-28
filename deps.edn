@@ -1,9 +1,10 @@
-{:paths ["src" "pkg"]
+{:paths ["src" "pkg" "zrc"]
 
  :lib "zen-lang/cli"
  :version "0.0.1-SNAPSHOT"
 
  :deps {org.clojure/clojure  {:mvn/version "1.11.1"}
+        zen-lang/zen {:mvn/version "0.0.1-SNAPSHOT"}
         healthsamurai/matcho {:mvn/version "0.3.9"}}
 
  :aliases

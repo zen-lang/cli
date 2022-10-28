@@ -1,13 +1,12 @@
 (ns core
   (:gen-class)
-  (:require [zen.package]
-            [zen.changes]
-            [zen.core]
+  (:require [zen.core]
             [clojure.pprint]
             [clojure.java.io :as io]
             [clojure.string]
             [clojure.edn]
             [clojure.stacktrace]
+            [clojure.java.shell :as shell]
             [clojure.java.shell]))
 
 
@@ -21,11 +20,6 @@
 
 (defn apply-with-opts [f args opts]
   (apply f (conj (vec args) opts)))
-
-
-(defn get-pwd [& [{:keys [pwd] :as opts}]]
-  (or (some-> pwd (clojure.string/replace #"/+$" ""))
-      (zen.package/pwd :silent true)))
 
 
 (defn get-return-fn [& [opts]]
@@ -89,8 +83,46 @@
 (def commands
   {"echo"       (fn [& args] args)})
 
+
+(defn get-pwd [& [{:keys [pwd] :as opts}]]
+  (let [sh-fn shell/sh
+        pwd (clojure.string/trim-newline (:out (sh-fn "pwd")))]
+    (or (some-> pwd (clojure.string/replace #"/+$" ""))
+        (pwd :silent true))))
+
+(defn collect-all-project-namespaces [opts]
+  (let [pwd (get-pwd opts)
+        zrc (str pwd "/zrc")
+        relativize #(subs % (count zrc))
+        zrc-edns (->> zrc
+                      clojure.java.io/file
+                      file-seq
+                      (filter #(clojure.string/ends-with? % ".edn"))
+                      (map #(relativize (.getAbsolutePath %)))
+                      (remove clojure.string/blank?)
+                      (map #(subs % 1)))
+        namespaces (map #(-> %
+                             (clojure.string/replace ".edn" "")
+                             (clojure.string/replace \/ \.)
+                             symbol)
+                        zrc-edns)]
+    namespaces))
+
+
 (defn -main [& [cmd-name & args]]
   (if (some? cmd-name)
     ((get-return-fn) (cmd commands cmd-name args))
     (repl commands))
   (System/exit 0))
+
+
+(comment
+
+  (collect-all-project-namespaces {})
+
+  (get-pwd {})
+
+  (let [sh-fn shell/sh]
+    (clojure.string/trim-newline (:out (sh-fn "pwd"))))
+
+  )

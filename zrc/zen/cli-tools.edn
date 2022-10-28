@@ -1,0 +1,7 @@
+{ns zen.cli-tools
+
+ command
+ {:zen/tags #{zen/tag zen/schema}}
+
+ config
+ {:zen/tags #{zen/tag zen/schema}}}

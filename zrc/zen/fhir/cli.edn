@@ -1,0 +1,10 @@
+{ns zen.fhir.cli
+ import #{zen.cli-tools zen.cli}
+
+ generate-from-npm #_"one string, another string"
+ {:zen/tags #{zen.cli-tools/command}}
+
+ cli-config
+ {:zen/tags #{zen.cli-tools/config}
+  :commands {:generate-from-npm {:command generate-from-npm}
+             :zen {:config zen.cli/cli-config}}}}
