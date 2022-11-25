@@ -42,13 +42,17 @@
        :args {:type zen/vector
               :maxItems 0}}
 
+      math-config
+      {:zen/tags #{zen.cli-tools/config}
+       :commands {:+ {:command +}}}
+
       my-config
       {:zen/tags #{zen.cli-tools/config}
        :commands {:identity  {:command identity}
-                  :+         {:command +}
                   :undefined {:command undefined}
                   :no-impl   {:command no-implementation}
-                  :fail      {:command throw-exception}}}})
+                  :fail      {:command throw-exception}
+                  :math      {:config math-config}}}})
 
   (matcho/match (zen.core/errors ztx)
                 [{:path [:commands :undefined :command]}
@@ -71,8 +75,8 @@
                     {::sut/result "foo"
                      ::sut/status :ok}))
 
-    (t/testing "positional args"
-      (matcho/match (sut/cli-exec ztx 'my-cli/my-config ["+" "4" "2" "2"])
+    (t/testing "positional args and also subcommand"
+      (matcho/match (sut/cli-exec ztx 'my-cli/my-config ["math" "+" "4" "2" "2"])
                     {::sut/result 8
                      ::sut/status :ok})))
 

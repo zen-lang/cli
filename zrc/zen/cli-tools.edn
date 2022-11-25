@@ -22,8 +22,10 @@
   :keys {:commands {:type zen/map
                     :key {:type zen/keyword}
                     :values {:type zen/map
-                             :require #{:command}
-                             :keys {:command {:type zen/symbol, :tags #{command}}}}}}}}
+                             :require #{#{:config :command}}
+                             :exclusive-keys #{#{:config :command}}
+                             :keys {:command {:type zen/symbol, :tags #{command}}
+                                    :config  {:type zen/symbol :tags #{config}}}}}}}}
 
 ;; TODO
 ;; global args
