@@ -1,32 +1,76 @@
 (ns zen.cli-tools
-  (:require [core :as c]
-            [zen.core :as zen]))
+  (:require [clojure.edn]
+            [clojure.string]
+            [zen.core]))
 
-(def ztx (zen/new-context {:unsafe true}))
 
-(defmulti command (fn [command-name _args] command-name))
+(defn command-dispatch [command-name & _args]
+  command-name)
 
-(comment
 
-  (def project-namespaces (c/collect-all-project-namespaces {}))
+(defmulti command #'command-dispatch :default ::not-found)
 
-  (zen/read-ns ztx 'zen.cli-tools)
 
-  )
+(defmethod command ::not-found [command-name _command-args] #_"TODO: return help"
+  {::status :error
+   ::code ::implementation-missing
+   ::result {:message (str "Command '" command-name " implementation is missing")}})
 
-(defn get-config
-  []
-  (let [project-namespaces (c/collect-all-project-namespaces {})
-        _ (doseq [ns project-namespaces]
-            (zen/read-ns ztx (symbol ns)))]))
 
-(defn parse
-  []
-  "parsed")
+(defn coerce-args-style-dispatch [command-args-def _command-args]
+  (:args-style command-args-def :positional))
 
-(defn cli-exec [config & args]
-  (let [{:keys [command-name command-args]} (apply parse args)]
-    (command command-name)))
+
+(defmulti coerce-args-style #'coerce-args-style-dispatch)
+
+
+(defmethod coerce-args-style :named [_command-args-def command-args]
+  (clojure.edn/read-string (str "{" (clojure.string/join " " command-args) "}")))
+
+
+(defmethod coerce-args-style :positional [_command-args-def command-args]
+  (clojure.edn/read-string (str "[" (clojure.string/join " " command-args) "]")))
+
+
+(defn cli-exec [ztx config-sym args]
+  (let [config (zen.core/get-symbol ztx config-sym)
+        commands (:commands config)
+
+        {:keys [command-name command-args]}
+        (let [[command-name & command-args] args]
+          {:command-name (symbol command-name)
+           :command-args command-args})
+
+        command-entry (get commands (keyword command-name))
+
+        command-sym (:command command-entry)]
+
+    (if (some? command-sym)
+      (if-let [command-def (zen.core/get-symbol ztx command-sym)]
+        (let [coerced-args      (coerce-args-style command-def command-args)
+              args-validate-res (zen.core/validate-schema ztx
+                                                          (:args command-def)
+                                                          coerced-args)]
+          (if (empty? (:errors args-validate-res))
+            (let [command-res (try (command command-sym coerced-args)
+                                   (catch Exception e
+                                     #::{:result {:exception e}
+                                         :status :error
+                                         :code   ::exception}))]
+              (if (::status command-res)
+                command-res
+                #::{:result command-res
+                    :status :ok}))
+            #::{:status :error
+                :code ::invalid-args
+                :result {:message "invalid args"
+                          :validation-result args-validate-res}}))
+        #::{:status :error
+            :code ::undefined-command
+            :result {:message "undefined command"}})
+      #::{:status :error
+          :code ::unknown-command
+          :result {:message "unknown command"}})))
 
 
 (defn cli-repl [config])

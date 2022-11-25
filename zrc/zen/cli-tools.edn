@@ -1,7 +1,41 @@
 {ns zen.cli-tools
 
  command
- {:zen/tags #{zen/tag zen/schema}}
+ {:zen/tags #{zen/tag zen/schema}
+  :type zen/map
+  :keys {:args-style {:type zen/keyword
+                      :enum [{:value :positional-and-then-named}
+                             {:value :positional}
+                             {:value :named}]}
+
+         :args {:type zen/map
+                :require #{:type}
+                :keys {:type {:type zen/symbol
+                              :enum [{:value zen/map}
+                                     {:value zen/vector}]}}
+                :confirms #{zen/schema}}}}
 
  config
- {:zen/tags #{zen/tag zen/schema}}}
+ {:zen/tags #{zen/tag zen/schema}
+  :type zen/map
+  :require #{:commands}
+  :keys {:commands {:type zen/map
+                    :key {:type zen/keyword}
+                    :values {:type zen/map
+                             :require #{:command}
+                             :keys {:command {:type zen/symbol, :tags #{command}}}}}}}}
+
+;; TODO
+;; global args
+;; nested helps
+;; verbosity level
+;; output formats
+;; klog
+;; before comand exit add await on klog agent (to prevent data loss)
+;; positional & named args
+
+;; Reference examples
+;; clojure -X ns/fn :foo '"bar"' :baz quux
+;; => {:boo "bar", :baz 'quux}
+;; clojure -m ns :foo bar :baz quux
+;; => [":foo" "bar" ":baz" "quux"]

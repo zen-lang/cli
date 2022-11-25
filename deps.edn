@@ -4,7 +4,8 @@
  :version "0.0.1-SNAPSHOT"
 
  :deps {org.clojure/clojure  {:mvn/version "1.11.1"}
-        zen-lang/zen {:mvn/version "0.0.1-SNAPSHOT"}
+        zen-lang/zen {:git/url "https://github.com/zen-lang/zen"
+                      :sha "472021253c6a73d0a41e9ca795932f1fdb454914"}
         healthsamurai/matcho {:mvn/version "0.3.9"}}
 
  :aliases
