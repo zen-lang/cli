@@ -5,7 +5,7 @@
             [matcho.core :as matcho]))
 
 
-(t/deftest ^:kaocha/pending cli-tools-schema-test
+(t/deftest cli-tools-schema-test
   (def ztx (zen.core/new-context))
 
   (zen.core/load-ns
