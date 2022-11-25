@@ -74,6 +74,10 @@
         nested-config-sym  (:config command-entry)]
 
     (cond
+      (= "help" command-name)
+      #::{:status :ok
+          :result commands}
+
       (some? nested-config-sym)
       (cli-exec ztx nested-config-sym command-args)
 
