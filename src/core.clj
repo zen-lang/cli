@@ -1,13 +1,14 @@
 (ns core
-  (:gen-class)
   (:require [zen.core]
             [clojure.pprint]
             [clojure.java.io :as io]
             [clojure.string]
             [clojure.edn]
+            [zen.cli-tools :as ct]
             [clojure.stacktrace]
             [clojure.java.shell :as shell]
-            [clojure.java.shell]))
+            [clojure.java.shell])
+  (:gen-class))
 
 
 (defn str->edn [x]
@@ -39,7 +40,8 @@
 (defn command-not-found-err-message [cmd-name available-commands]
   {:status :error
    :code :command-not-found
-   :message (str "Command " cmd-name " not found. Available commands: " (clojure.string/join ", " available-commands))})
+   :message (str "Command " cmd-name " not found. Available commands: "
+                 (clojure.string/join ", " available-commands))})
 
 
 (defmacro exception->error-result [& body]
@@ -52,10 +54,12 @@
         :exception (Throwable->map e#)})))
 
 
-(defn repl [commands & [opts]]
+(defn repl [ztx config-sym & [opts]]
   (let [prompt-fn (get-prompt-fn opts)
         read-fn   (get-read-fn opts)
         return-fn (get-return-fn opts)
+        config (zen.core/get-symbol ztx config-sym)
+        commands (:commands config)
 
         opts (update opts :stop-repl-atom #(or % (atom false)))]
     (while (not @(:stop-repl-atom opts))
@@ -108,12 +112,56 @@
                         zrc-edns)]
     namespaces))
 
+(defn cli-main [ztx config-sym cmd-name args]
+  (if (do (seq cmd-name)
+          (prn cmd-name))
+    (fn [] (ct/cli-exec ztx config-sym args))
+    (repl ztx config-sym))
+  (prn "Exited."))
 
 (defn -main [& [cmd-name & args]]
-  (if (some? cmd-name)
-    ((get-return-fn) (cmd commands cmd-name args))
-    (repl commands))
-  (System/exit 0))
+  (let [ztx (zen.core/new-context)]
+    (zen.core/load-ns ztx
+     '{:ns 'my-cli
+       :import #{'zen.cli-tools}
+
+       'identity
+       {:zen/tags #{'zen.cli-tools/command}
+        :zen/desc "returns its arg"
+        :args-style :named
+        :args {:type 'zen/map
+               :require #{:value}
+               :keys {:value {:type 'zen/string
+                              :zen/desc "value that will be returned by this fn"}}}}
+
+       '+
+       {:zen/tags #{'zen.cli-tools/command}
+        :zen/desc "calculates sum of passed arguments"
+        :args-style :positional
+        :args {:type 'zen/vector
+               :zen/desc "numbers that will be summed together"
+               :every {:type 'zen/number}}}
+
+       'no-implementation
+       {:zen/tags #{'zen.cli-tools/command}
+        :zen/desc "no implementation should be defined. Needed for implementation missing error handling"
+        :args {:type 'zen/vector
+               :maxItems 0}}
+
+       'throw-exception
+       {:zen/tags #{'zen.cli-tools/command}
+        :zen/desc "Throws an exception. Needed for testing exception handling"
+        :args {:type 'zen/vector
+               :maxItems 0}}
+
+       'my-config
+       {:zen/tags #{'zen.cli-tools/config}
+        :commands {:identity  {:command 'identity}
+                   :+         {:command '+}
+                   :undefined {:command 'undefined}
+                   :no-impl   {:command 'no-implementation}
+                   :fail      {:command 'throw-exception}}}})
+    (cli-main ztx 'my-cli/my-config cmd-name args)) )
 
 
 (comment

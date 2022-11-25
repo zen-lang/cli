@@ -15,9 +15,10 @@
    :jvm-opts    ^:replace ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts   ["-m" "kaocha.runner" "--config-file" "test/test.edn"]}
 
+
   :build
   {:extra-paths ["build"]
-   :ns-default build.zen
+   :ns-default build
    :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]
    :extra-deps {io.github.clojure/tools.build {:git/url "https://github.com/clojure/tools.build"
                                                :sha "cde5adf5d56fe7238de509339e63627f438e5d4b"}}}}}

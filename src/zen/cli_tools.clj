@@ -4,17 +4,21 @@
             [zen.core]))
 
 
-(defn command-dispatch [command-name & _args]
-  command-name)
 
+(defn command-dispatch [ztx command-name & _args]
+  command-name)
 
 (defmulti command #'command-dispatch :default ::not-found)
 
 
-(defmethod command ::not-found [command-name _command-args] #_"TODO: return help"
+(defmethod command ::not-found
+  [ztx command-name _command-args] #_"TODO: return help"
   {::status :error
    ::code ::implementation-missing
    ::result {:message (str "Command '" command-name " implementation is missing")}})
+
+(defmethod command ::get-symbol
+  [ztx command-name _command-args])
 
 
 (defn coerce-args-style-dispatch [command-args-def _command-args]
@@ -46,13 +50,13 @@
         command-sym (:command command-entry)]
 
     (if (some? command-sym)
-      (if-let [command-def (zen.core/get-symbol ztx command-sym)]
+      (if-let [command-def      (zen.core/get-symbol ztx command-sym)]
         (let [coerced-args      (coerce-args-style command-def command-args)
               args-validate-res (zen.core/validate-schema ztx
                                                           (:args command-def)
                                                           coerced-args)]
           (if (empty? (:errors args-validate-res))
-            (let [command-res (try (command command-sym coerced-args)
+            (let [command-res (try (command ztx command-sym coerced-args)
                                    (catch Exception e
                                      #::{:result {:exception e}
                                          :status :error
@@ -71,6 +75,3 @@
       #::{:status :error
           :code ::unknown-command
           :result {:message "unknown command"}})))
-
-
-(defn cli-repl [config])
