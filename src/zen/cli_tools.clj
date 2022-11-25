@@ -31,43 +31,57 @@
 (defmethod coerce-args-style :positional [_command-args-def command-args]
   (clojure.edn/read-string (str "[" (clojure.string/join " " command-args) "]")))
 
+(defn handle-command
+  [ztx command-sym command-args]
+  (if-let [command-def (zen.core/get-symbol ztx command-sym)]
+    (let [coerced-args      (coerce-args-style command-def command-args)
+          args-validate-res (zen.core/validate-schema ztx
+                                                      (:args command-def)
+                                                      coerced-args)]
+      (if (empty? (:errors args-validate-res))
+        (let [command-res (try (command command-sym coerced-args)
+                               (catch Exception e
+                                 #::{:result {:exception e}
+                                     :status :error
+                                     :code   ::exception}))]
+          (if (::status command-res)
+            command-res
+            #::{:result command-res
+                :status :ok}))
+        #::{:status :error
+            :code   ::invalid-args
+            :result {:message           "invalid args"
+                     :validation-result args-validate-res}}))
+    #::{:status :error
+        :code   ::undefined-command
+        :result {:message "undefined command"}}))
+
+
+(defn extract-commands-params
+  [[command-name & command-args]]
+  {:command-name command-name
+   :command-args command-args})
+
 
 (defn cli-exec [ztx config-sym args]
   (let [config (zen.core/get-symbol ztx config-sym)
         commands (:commands config)
 
-        {:keys [command-name command-args]}
-        (let [[command-name & command-args] args]
-          {:command-name (symbol command-name)
-           :command-args command-args})
+        {:keys [command-name command-args]} (extract-commands-params args)
 
         command-entry (get commands (keyword command-name))
 
-        command-sym (:command command-entry)]
+        command-sym        (:command command-entry)
+        nested-config-sym  (:config command-entry)]
 
-    (if (some? command-sym)
-      (if-let [command-def (zen.core/get-symbol ztx command-sym)]
-        (let [coerced-args      (coerce-args-style command-def command-args)
-              args-validate-res (zen.core/validate-schema ztx
-                                                          (:args command-def)
-                                                          coerced-args)]
-          (if (empty? (:errors args-validate-res))
-            (let [command-res (try (command command-sym coerced-args)
-                                   (catch Exception e
-                                     #::{:result {:exception e}
-                                         :status :error
-                                         :code   ::exception}))]
-              (if (::status command-res)
-                command-res
-                #::{:result command-res
-                    :status :ok}))
-            #::{:status :error
-                :code ::invalid-args
-                :result {:message "invalid args"
-                          :validation-result args-validate-res}}))
-        #::{:status :error
-            :code ::undefined-command
-            :result {:message "undefined command"}})
+    (cond
+      (some? nested-config-sym)
+      (cli-exec ztx nested-config-sym command-args)
+
+      (some? command-sym)
+      (handle-command ztx command-sym command-args)
+
+      :else
       #::{:status :error
           :code ::unknown-command
           :result {:message "unknown command"}})))
