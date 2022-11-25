@@ -57,8 +57,7 @@
         :result {:message "undefined command"}}))
 
 
-(defn extract-commands-params
-  [[command-name & command-args]]
+(defn extract-commands-params [[command-name & command-args]]
   {:command-name command-name
    :command-args command-args})
 

@@ -20,7 +20,7 @@
 
 
 (defn apply-with-opts [f args opts]
-  (apply f (conj (vec args) opts)))
+  (f (vec args) #_opts))
 
 
 (defn get-return-fn [& [opts]]
@@ -58,20 +58,17 @@
   (let [prompt-fn (get-prompt-fn opts)
         read-fn   (get-read-fn opts)
         return-fn (get-return-fn opts)
-        config (zen.core/get-symbol ztx config-sym)
-        commands (:commands config)
+        config    (zen.core/get-symbol ztx config-sym)
+        commands  (:commands config)
 
         opts (update opts :stop-repl-atom #(or % (atom false)))]
     (while (not @(:stop-repl-atom opts))
       (return-fn
         (exception->error-result
           (prompt-fn)
-          (let [line              (read-fn)
-                [cmd-name rest-s] (clojure.string/split line #" " 2)
-                args              (split-args-by-space rest-s)]
-            (if-let [cmd-fn (get commands cmd-name)]
-              (apply-with-opts cmd-fn args opts)
-              (command-not-found-err-message cmd-name (keys commands)))))))))
+          (let [line (read-fn)
+                args (split-args-by-space line)]
+            (ct/cli-exec ztx config-sym args)))))))
 
 
 (defn cmd-unsafe [commands cmd-name args & [opts]]
@@ -112,56 +109,69 @@
                         zrc-edns)]
     namespaces))
 
-(defn cli-main [ztx config-sym cmd-name args]
-  (if (do (seq cmd-name)
-          (prn cmd-name))
-    (fn [] (ct/cli-exec ztx config-sym args))
-    (repl ztx config-sym))
-  (prn "Exited."))
 
-(defn -main [& [cmd-name & args]]
+(defn cli-main [ztx config-sym [cmd-name :as args]]
+  (if (seq cmd-name)
+    (prn (ct/cli-exec ztx config-sym args))
+    (repl ztx config-sym)))
+
+
+(defmethod ct/command 'my-cli/identity [_ {:keys [value]}]
+  value)
+
+
+(defmethod ct/command 'my-cli/+ [_ args]
+  (apply + args))
+
+
+(defmethod ct/command 'my-cli/throw-exception [_ args]
+  (throw (Exception. "some exception during command evaluation")))
+
+
+(defn -main [& args]
   (let [ztx (zen.core/new-context)]
-    (zen.core/load-ns ztx
-     '{:ns 'my-cli
-       :import #{'zen.cli-tools}
+    (zen.core/load-ns
+      ztx
+      '{:ns my-cli
+        :import #{zen.cli-tools}
 
-       'identity
-       {:zen/tags #{'zen.cli-tools/command}
-        :zen/desc "returns its arg"
-        :args-style :named
-        :args {:type 'zen/map
-               :require #{:value}
-               :keys {:value {:type 'zen/string
-                              :zen/desc "value that will be returned by this fn"}}}}
+        identity
+        {:zen/tags #{zen.cli-tools/command}
+         :zen/desc "returns its arg"
+         :args-style :named
+         :args {:type zen/map
+                :require #{:value}
+                :keys {:value {:type zen/string
+                               :zen/desc "value that will be returned by this fn"}}}}
 
-       '+
-       {:zen/tags #{'zen.cli-tools/command}
-        :zen/desc "calculates sum of passed arguments"
-        :args-style :positional
-        :args {:type 'zen/vector
-               :zen/desc "numbers that will be summed together"
-               :every {:type 'zen/number}}}
+        +
+        {:zen/tags #{zen.cli-tools/command}
+         :zen/desc "calculates sum of passed arguments"
+         :args-style :positional
+         :args {:type zen/vector
+                :zen/desc "numbers that will be summed together"
+                :every {:type zen/number}}}
 
-       'no-implementation
-       {:zen/tags #{'zen.cli-tools/command}
-        :zen/desc "no implementation should be defined. Needed for implementation missing error handling"
-        :args {:type 'zen/vector
-               :maxItems 0}}
+        no-implementation
+        {:zen/tags #{zen.cli-tools/command}
+         :zen/desc "no implementation should be defined. Needed for implementation missing error handling"
+         :args {:type zen/vector
+                :maxItems 0}}
 
-       'throw-exception
-       {:zen/tags #{'zen.cli-tools/command}
-        :zen/desc "Throws an exception. Needed for testing exception handling"
-        :args {:type 'zen/vector
-               :maxItems 0}}
+        throw-exception
+        {:zen/tags #{zen.cli-tools/command}
+         :zen/desc "Throws an exception. Needed for testing exception handling"
+         :args {:type zen/vector
+                :maxItems 0}}
 
-       'my-config
-       {:zen/tags #{'zen.cli-tools/config}
-        :commands {:identity  {:command 'identity}
-                   :+         {:command '+}
-                   :undefined {:command 'undefined}
-                   :no-impl   {:command 'no-implementation}
-                   :fail      {:command 'throw-exception}}}})
-    (cli-main ztx 'my-cli/my-config cmd-name args)) )
+        my-config
+        {:zen/tags #{zen.cli-tools/config}
+         :commands {:identity  {:command identity}
+                    :+         {:command +}
+                    :undefined {:command undefined}
+                    :no-impl   {:command no-implementation}
+                    :fail      {:command throw-exception}}}})
+    (cli-main ztx 'my-cli/my-config args)) )
 
 
 (comment
