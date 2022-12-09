@@ -1,120 +1,12 @@
 (ns core
   (:require [zen.core]
             [clojure.pprint]
-            [clojure.java.io :as io]
             [clojure.string]
             [clojure.edn]
             [zen.cli-tools :as ct]
             [clojure.stacktrace]
-            [clojure.java.shell :as shell]
-            [clojure.java.shell])
+            [clojure.java.shell :as shell])
   (:gen-class))
-
-
-(defn str->edn [x]
-  (clojure.edn/read-string (str x)))
-
-
-(defn split-args-by-space [args-str]
-  (map pr-str (clojure.edn/read-string (str \[ args-str \]))))
-
-
-(defn apply-with-opts [f args opts]
-  (f (vec args) #_opts))
-
-
-(defn get-return-fn [& [opts]]
-  (or (:return-fn opts) clojure.pprint/pprint))
-
-
-(defn get-read-fn [& [opts]]
-  (or (:read-fn opts) read-line))
-
-
-(defn get-prompt-fn [& [opts]]
-  (or (:prompt-fn opts)
-      #(do (print "zen> ")
-           (flush))))
-
-
-(defn command-not-found-err-message [cmd-name available-commands]
-  {:status :error
-   :code :command-not-found
-   :message (str "Command " cmd-name " not found. Available commands: "
-                 (clojure.string/join ", " available-commands))})
-
-
-(defmacro exception->error-result [& body]
-  `(try
-     ~@body
-     (catch Exception e#
-       {:status    :error
-        :code      :exception
-        :message   (.getMessage e#)
-        :exception (Throwable->map e#)})))
-
-
-(defn repl [ztx config-sym & [opts]]
-  (let [prompt-fn (get-prompt-fn opts)
-        read-fn   (get-read-fn opts)
-        return-fn (get-return-fn opts)
-        config    (zen.core/get-symbol ztx config-sym)
-        commands  (:commands config)
-
-        opts (update opts :stop-repl-atom #(or % (atom false)))]
-    (while (not @(:stop-repl-atom opts))
-      (return-fn
-        (exception->error-result
-          (prompt-fn)
-          (let [line (read-fn)
-                args (split-args-by-space line)]
-            (ct/cli-exec ztx config-sym args)))))))
-
-
-(defn cmd-unsafe [commands cmd-name args & [opts]]
-  (if-let [cmd-fn (get commands cmd-name)]
-    (apply-with-opts cmd-fn args opts)
-    (command-not-found-err-message cmd-name (keys commands))))
-
-
-(defn cmd [& args]
-  (exception->error-result
-    (apply cmd-unsafe args)))
-
-(def commands
-  {"echo"       (fn [& args] args)})
-
-
-(defn get-pwd [& [{:keys [pwd] :as opts}]]
-  (let [sh-fn shell/sh
-        pwd (clojure.string/trim-newline (:out (sh-fn "pwd")))]
-    (or (some-> pwd (clojure.string/replace #"/+$" ""))
-        (pwd :silent true))))
-
-(defn collect-all-project-namespaces [opts]
-  (let [pwd (get-pwd opts)
-        zrc (str pwd "/zrc")
-        relativize #(subs % (count zrc))
-        zrc-edns (->> zrc
-                      clojure.java.io/file
-                      file-seq
-                      (filter #(clojure.string/ends-with? % ".edn"))
-                      (map #(relativize (.getAbsolutePath %)))
-                      (remove clojure.string/blank?)
-                      (map #(subs % 1)))
-        namespaces (map #(-> %
-                             (clojure.string/replace ".edn" "")
-                             (clojure.string/replace \/ \.)
-                             symbol)
-                        zrc-edns)]
-    namespaces))
-
-
-(defn cli-main [ztx config-sym [cmd-name :as args]]
-  (if (seq cmd-name)
-    (prn (ct/cli-exec ztx config-sym args))
-    (repl ztx config-sym)))
-
 
 (defmethod ct/command 'my-cli/identity [_ {:keys [value]}]
   value)
@@ -171,15 +63,10 @@
                     :undefined {:command undefined}
                     :no-impl   {:command no-implementation}
                     :fail      {:command throw-exception}}}})
-    (cli-main ztx 'my-cli/my-config args)) )
+    (ct/cli-main ztx 'my-cli/my-config args)))
 
 
 (comment
-
-  (collect-all-project-namespaces {})
-
-  (get-pwd {})
-
   (let [sh-fn shell/sh]
     (clojure.string/trim-newline (:out (sh-fn "pwd"))))
 
