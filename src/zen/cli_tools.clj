@@ -6,6 +6,20 @@
             [clojure.java.shell :as shell]))
 
 
+(defn get-return-fn [& [opts]]
+  (or (:return-fn opts) clojure.pprint/pprint))
+
+
+(defn get-read-fn [& [opts]]
+  (or (:read-fn opts) read-line))
+
+
+(defn get-prompt-fn [& [opts]]
+  (or (:prompt-fn opts)
+      #(do (print "zen> ")
+           (flush))))
+
+
 (defn command-dispatch [command-name & _args]
   command-name)
 
@@ -34,14 +48,15 @@
   (clojure.edn/read-string (str "[" (clojure.string/join " " command-args) "]")))
 
 (defn handle-command
-  [ztx command-sym command-args]
+  [ztx command-sym command-args & [opts]]
   (if-let [command-def (zen.core/get-symbol ztx command-sym)]
     (let [coerced-args      (coerce-args-style command-def command-args)
-          args-validate-res (zen.core/validate-schema ztx
-                                                      (:args command-def)
-                                                      coerced-args)]
+          args-validate-res (zen.v2-validation/validate-schema ztx
+                                                               (:args command-def)
+                                                               coerced-args
+                                                               {:sch-symbol command-sym})]
       (if (empty? (:errors args-validate-res))
-        (let [command-res (try (command command-sym coerced-args)
+        (let [command-res (try (command command-sym coerced-args opts)
                                (catch Exception e
                                  #::{:result {:exception e}
                                      :status :error
@@ -64,7 +79,7 @@
    :command-args command-args})
 
 
-(defn cli-exec [ztx config-sym args]
+(defn cli-exec [ztx config-sym args & [opts]]
   (let [config (zen.core/get-symbol ztx config-sym)
         commands (:commands config)
 
@@ -81,15 +96,20 @@
           :result commands}
 
       (some? nested-config-sym)
-      (cli-exec ztx nested-config-sym command-args)
+      (cli-exec ztx nested-config-sym command-args opts)
 
       (some? command-sym)
-      (handle-command ztx command-sym command-args)
+      (handle-command ztx command-sym command-args opts)
 
       :else
       #::{:status :error
           :code ::unknown-command
           :result {:message "unknown command"}})))
+
+
+(defn do-cli-exec [ztx config-sym args & [opts]]
+  (let [return-fn (get-return-fn opts)]
+    (return-fn (cli-exec ztx config-sym args opts))))
 
 
 (defn cli-repl [config])
@@ -105,21 +125,6 @@
 
 (defn apply-with-opts [f args opts]
   (f (vec args) #_opts))
-
-
-(defn get-return-fn [& [opts]]
-  (or (:return-fn opts) clojure.pprint/pprint))
-
-
-(defn get-read-fn [& [opts]]
-  (or (:read-fn opts) read-line))
-
-
-(defn get-prompt-fn [& [opts]]
-  (or (:prompt-fn opts)
-      #(do (print "zen> ")
-           (flush))))
-
 
 (defn command-not-found-err-message [cmd-name available-commands]
   {:status :error
@@ -194,7 +199,18 @@
     namespaces))
 
 
-(defn cli-main [ztx config-sym [cmd-name :as args]]
+(defn cli-main* [ztx config-sym [cmd-name :as args] opts]
   (if (seq cmd-name)
-    (prn (cli-exec ztx config-sym args))
-    (repl ztx config-sym)))
+    (do-cli-exec ztx config-sym args opts)
+    (repl ztx config-sym opts)))
+
+
+(defn cli-main [ztx config-sym args & [opts]]
+  (let [main-ns (symbol (namespace config-sym))]
+    (if (= :zen/loaded (zen.core/read-ns ztx main-ns))
+      (cli-main* ztx config-sym args opts)
+      {::code   ::load-failed
+       ::status :error
+       ::result {:message "Couldn't load main CLI namespace"
+                 :ns      main-ns
+                 :errors  (zen.core/errors ztx)}})))
