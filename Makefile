@@ -5,3 +5,6 @@ test:
 
 build:
 	clojure -T:build uber
+
+repl:
+	clj -A:clj:nrepl -m nrepl.cmdline

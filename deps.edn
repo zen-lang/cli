@@ -15,6 +15,7 @@
    :jvm-opts    ^:replace ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts   ["-m" "kaocha.runner" "--config-file" "test/test.edn"]}
 
+  :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.0.0"}}}
 
   :build
   {:extra-paths ["build"]
