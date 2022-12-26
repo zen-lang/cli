@@ -60,13 +60,13 @@
                   :ns 'my-cli}
                  nil])
 
-  (defmethod sut/command 'my-cli/identity [_ {:keys [value]}]
+  (defmethod sut/command 'my-cli/identity [_ {:keys [value]} _opts]
     value)
 
-  (defmethod sut/command 'my-cli/+ [_ args]
+  (defmethod sut/command 'my-cli/+ [_ args _opts]
     (apply + args))
 
-  (defmethod sut/command 'my-cli/throw-exception [_ args]
+  (defmethod sut/command 'my-cli/throw-exception [_ args _opts]
     (throw (Exception. "some exception during command evaluation")))
 
   (t/testing "success cmd exec"

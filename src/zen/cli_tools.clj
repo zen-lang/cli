@@ -20,14 +20,14 @@
            (flush))))
 
 
-(defn command-dispatch [command-name & _args]
+(defn command-dispatch [command-name _command-args _opts]
   command-name)
 
 
 (defmulti command #'command-dispatch :default ::not-found)
 
 
-(defmethod command ::not-found [command-name _command-args] #_"TODO: return help"
+(defmethod command ::not-found [command-name _command-args _opts] #_"TODO: return help"
   {::status :error
    ::code ::implementation-missing
    ::result {:message (str "Command '" command-name " implementation is missing")}})
@@ -157,7 +157,7 @@
           (prompt-fn)
           (let [line (read-fn)
                 args (split-args-by-space line)]
-            (cli-exec ztx config-sym args)))))))
+            (cli-exec ztx config-sym args opts)))))))
 
 
 (defn cmd-unsafe [commands cmd-name args & [opts]]
